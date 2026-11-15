@@ -53,6 +53,9 @@ const WEAPONS = [
   { body: 105, head: 210, interval: 85, pellets: 1 },  // STG-44 (только Mystery Box)
   { body: 70, head: 140, interval: 60, pellets: 1 },   // MP5SD (только Mystery Box)
   { body: 72, head: 144, interval: 320, pellets: 8 },  // SPAS-12 (только Mystery Box): полуавтомат, 8 дробин
+  { body: 130, head: 260, interval: 120, pellets: 1 }, // BAR (только Mystery Box)
+  { body: 100, head: 200, interval: 75, pellets: 1 },  // FG-42 (только Mystery Box)
+  { body: 120, head: 240, interval: 95, pellets: 1 },  // Type 99 (только Mystery Box)
 ];
 // Всё, что привязано к карте. Порядок дверей и окон ОБЯЗАН совпадать с клиентом (index.html).
 // windows: [x, z, y] — центр окна на стене и высота глаз игрока на этом этаже.
@@ -355,7 +358,7 @@ function attachHandlers(socket) {
     ctx.player.lastBoxTakeAt = now;
     toRoom(ctx.room.code, socket.id).emit('boxTaken', { playerId: socket.id });
   });
-  socket.on('grenadeThrow', ({ nid, x, y, z, vx, vy, vz } = {}) => {
+  socket.on('grenadeThrow',({ nid, x, y, z, vx, vy, vz } = {}) => {
     const ctx = roomAndPlayer(socket);
     if (!ctx || !ctx.room.game.started || !ctx.player.active || ctx.player.downed || typeof nid !== 'string') return;
     const now = Date.now();
@@ -562,7 +565,7 @@ function attachHandlers(socket) {
       if (!near(player, boxPos.x, boxPos.z, 3.5, boxPos.minY === undefined ? -1 : boxPos.minY, boxPos.maxY === undefined ? 3.2 : boxPos.maxY)) return failPurchase(socket, 'Подойдите к Mystery Box');
       if (room.game.boxBusyUntil > Date.now()) return failPurchase(socket, 'Mystery Box уже используется');
       price = 950;
-      boxResult = 1 + Math.floor(Math.random() * 12);
+      boxResult = 1 + Math.floor(Math.random() * (WEAPONS.length - 1));   // все, кроме стартового пистолета
     } else return failPurchase(socket, 'Неизвестная покупка');
     if (player.points < price) return failPurchase(socket, 'Не хватает очков');
     player.points -= price;

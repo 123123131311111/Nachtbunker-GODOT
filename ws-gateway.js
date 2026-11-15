@@ -65,7 +65,8 @@ function attachWs(server, hooks) {
     let alive = true, budget = RATE_PER_SEC, budgetAt = Date.now(), lastMsg = Date.now();
     ws.on('pong', () => { alive = true; });
     const beat = setInterval(() => {
-      // Прокси хостинга (Render) сам отвечает на ping WebSocket — обрыв видно только по тишине клиента.
+      // Прокси хостинга (Render) сам отвечает на ping WebSocket, поэтому обрыв видно только по тишине:
+      // клиент шлёт ["ping"] каждые 2 с — молчит дольше STALE_MS, значит связи нет.
       if (!alive || Date.now() - lastMsg > STALE_MS) { ws.terminate(); return; }
       alive = false;
       try { ws.ping(); } catch (e) { /* закрыт */ }

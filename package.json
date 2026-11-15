@@ -1,0 +1,19 @@
+{
+  "name": "nacht-bunker-multiplayer",
+  "version": "2.0.0",
+  "description": "Nacht Bunker multiplayer server: Express + Socket.IO (browser) + WebSocket /ws (Godot)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test:ws": "node tools/ws-bots.js ws://localhost:3000/ws 4"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5",
+    "ws": "^8.23.0"
+  }
+}

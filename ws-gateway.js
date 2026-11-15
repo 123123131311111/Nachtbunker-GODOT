@@ -11,7 +11,8 @@ const crypto = require('crypto');
 
 const PROTOCOL = 2;
 const GRACE_MS = 30000;         // сколько ждать переподключения
-const HEARTBEAT_MS = 5000;      // ping уровня WebSocket; два пропуска — соединение считается мёртвым
+const HEARTBEAT_MS = 3000;      // ping уровня WebSocket; два пропуска — соединение считается мёртвым
+const STALE_MS = 12000;         // тишина от клиента (он шлёт ping раз в 2 с) — связь потеряна
 const MAX_MSG = 64 * 1024;
 const RATE_PER_SEC = 120;       // защита от флуда: событий в секунду на соединение
 
@@ -61,16 +62,18 @@ function attachWs(server, hooks) {
 
   wss.on('connection', ws => {
     let sock = null;
-    let alive = true, budget = RATE_PER_SEC, budgetAt = Date.now();
+    let alive = true, budget = RATE_PER_SEC, budgetAt = Date.now(), lastMsg = Date.now();
     ws.on('pong', () => { alive = true; });
     const beat = setInterval(() => {
-      if (!alive) { ws.terminate(); return; }
+      // Прокси хостинга (Render) сам отвечает на ping WebSocket — обрыв видно только по тишине клиента.
+      if (!alive || Date.now() - lastMsg > STALE_MS) { ws.terminate(); return; }
       alive = false;
       try { ws.ping(); } catch (e) { /* закрыт */ }
     }, HEARTBEAT_MS);
 
     ws.on('message', raw => {
       const now = Date.now();
+      lastMsg = now;
       if (now - budgetAt >= 1000) { budget = RATE_PER_SEC; budgetAt = now; }
       if (--budget < 0) return;
       let msg;

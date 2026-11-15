@@ -347,6 +347,14 @@ function attachHandlers(socket) {
       vx: clamp(vx, -40, 40), vy: clamp(vy, -40, 40), vz: clamp(vz, -40, 40),
     });
   });
+  socket.on('boxTake', () => {   // игрок забрал оружие из Mystery Box — у остальных ящик закрывается
+    const ctx = roomAndPlayer(socket);
+    if (!ctx || !ctx.room.game.started) return;
+    const now = Date.now();
+    if (now - (ctx.player.lastBoxTakeAt || 0) < 500) return;
+    ctx.player.lastBoxTakeAt = now;
+    toRoom(ctx.room.code, socket.id).emit('boxTaken', { playerId: socket.id });
+  });
   socket.on('grenadeThrow', ({ nid, x, y, z, vx, vy, vz } = {}) => {
     const ctx = roomAndPlayer(socket);
     if (!ctx || !ctx.room.game.started || !ctx.player.active || ctx.player.downed || typeof nid !== 'string') return;

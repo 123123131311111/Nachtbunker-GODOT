@@ -75,9 +75,9 @@ const MAPS = {
     ],
     wall: { thompson: { x: -14.7, z: 10 }, shotgun: { x: -14.7, z: -11.5 }, mp40: { x: -4.22, z: 13 } },
     box: { x: 0.3, z: -13.25, available: dr => !!(dr[0] || dr[2] || dr[4]) },
-    qr: { x: 14.22, z: 8, minY: -1, maxY: 3.2 },
+    qr: { x: -14.25, z: 7, minY: -1, maxY: 3.2 },   // Nocturne: Быстрое возрождение и Быстрая перезарядка поменяны местами
     perks: {
-      cola: { x: -14.25, z: 7, minY: -1, maxY: 3.2 },
+      cola: { x: 14.22, z: 8, minY: -1, maxY: 3.2 },
       doubleTap: { x: -12, z: -14.25, minY: 3.2, maxY: 7.5 },
       juggernog: { x: -14.25, z: 2, minY: 3.2, maxY: 7.5 },
     },
@@ -106,6 +106,29 @@ const MAPS = {
       cola: { x: -7.2, z: 3.2, minY: 3.2, maxY: 7.5 },
       doubleTap: { x: 8.4, z: 3, minY: 3.2, maxY: 7.5 },
       juggernog: { x: 1000, z: 1000, minY: 3.2, maxY: 7.5 },
+    },
+  },
+  // «Завод» (только Godot-клиент): порядок дверей и окон = tools/maps/factory/factory_gameplay.gd
+  factory: {
+    doors: [
+      { x: 0, z: 6, price: 750 }, { x: -14, z: 0, price: 1250 }, { x: 14, z: 0, price: 1250 },
+      { x: -26, z: 6.5, price: 1000 }, { x: 0, z: -14, price: 1500 },
+    ],
+    windows: [
+      [-8.5, 6, 1.7], [8.5, 6, 1.7], [-8.5, -14, 1.7], [8.5, -14, 1.7], [-34, 3.6, 1.7], [-25.5, -6, 1.7],
+      [-14, 38, 1.7], [14, 38, 1.7], [-36, 22, 1.7], [36, 22, 1.7], [-12, -38, 1.7], [12, -38, 1.7], [-20, -26, 1.7],
+      [-23, -8, -2.3], [-36, 0.5, -2.3], [32, -12, -2.3], [40, 12, -2.3], [40, -12, -2.3],
+    ],
+    wall: { thompson: { x: -13.8, z: -4 }, shotgun: { x: 13.8, z: -8 }, mp40: { x: -22.2, z: 3.5 } },
+    box: { x: 0, z: -4, minY: -1, maxY: 3.2, available: dr => !!dr[0] },
+    boxes: [{ x: 0, z: -4, minY: -1, maxY: 3.2, available: dr => !!dr[0] }],
+    qr: { x: 43.35, z: 0, minY: -5.5, maxY: -1 },
+    levers: [{ x: -20.2, z: -5 }, { x: 32, z: 11.8 }],
+    upgrader: { x: 0, z: -23.8 },
+    perks: {
+      cola: { x: -35.3, z: -4.5, minY: -5.5, maxY: -1 },
+      doubleTap: { x: -13.3, z: -11.5, minY: 3.2, maxY: 7.5 },
+      juggernog: { x: 13.3, z: -11.5, minY: 3.2, maxY: 7.5 },
     },
   },
 };

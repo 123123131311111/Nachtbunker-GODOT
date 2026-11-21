@@ -20,7 +20,9 @@ for (const sg of [-1, 1]) {
   for (const z of [-9, 9]) for (const dx of [-4.3, 0, 4.3]) VK_WINS.push({ x: sg * 13 + dx, z });
 }
 const UPG_PRICE = 5500, UPG_MS = 4200;   // Улучшайзер (Verrückt): цена и время анимации — как на клиенте
-const DROP_CHANCE = 0.008, DP_CHANCE = 0.01, DROP_LIFE_MS = 32000, DP_MS = 25000;   // бонусы при убийстве зомби: MAX AMMO (2%) и DOUBLE POINTS (1%, x2 очки на 25 с)
+const DROP_CHANCE = 0.008, DP_CHANCE = 0.01, DROP_LIFE_MS = 32000, DP_MS = 25000;
+const INSTA_CHANCE = 0.006, KABOOM_CHANCE = 0.005, INSTA_MS = 30000, KABOOM_POINTS = 400;   // 2.0 (Godot): «Мгновенное убийство» (30 с, обычные зомби с 1 попадания) и «БАБАХ» (все обычные зомби, +400)
+const isBossZombie = z => !!z.boss || z.kind === 'necro' || z.kind === 'brute';   // бонусы при убийстве зомби: MAX AMMO (2%) и DOUBLE POINTS (1%, x2 очки на 25 с)
 const rooms = Object.create(null);
 const roomOf = Object.create(null);
 // Godot-клиент: урон оружия x1.5 к оригиналу (патч 1.2 Godot-версии; браузерная версия не меняется)
@@ -58,6 +60,8 @@ const WEAPONS = [
   { body: 100, head: 200, interval: 75, pellets: 1 },  // FG-42 (только Mystery Box)
   { body: 120, head: 240, interval: 95, pellets: 1 },  // Type 99 (только Mystery Box)
   { body: 190, head: 480, interval: 380, pellets: 1 }, // Револьвер .38 (только Mystery Box, Godot-клиент)
+  { body: 210, head: 640, interval: 420, pellets: 3 }, // 2.1 magnum (starter loadout, Godot client): pierces up to 3 zombies
+  { body: 48, head: 96, interval: 65, pellets: 1 },    // 2.1 machine pistol (starter loadout, Godot client)
 ];
 // Всё, что привязано к карте. Порядок дверей и окон ОБЯЗАН совпадать с клиентом (index.html).
 // windows: [x, z, y] — центр окна на стене и высота глаз игрока на этом этаже.
@@ -424,7 +428,8 @@ function attachHandlers(socket) {
       ? (room.game.round <= 3 ? { body: 100000, head: 100000 } : { body: Math.max(10, 150 * Math.pow(0.8, room.game.round - 3)), head: Math.max(10, 150 * Math.pow(0.8, room.game.round - 3)) })   // нож: до 3 раунда с 1 удара, дальше слабее
       : WEAPONS[shot.weapon];
     const damage = (head ? weapon.head : weapon.body) * (socket.godot && shot.weapon >= 0 ? GODOT_DMG_MULT : 1) * (player.perks.doubleTap && shot.weapon !== -2 ? 2 : 1) * (player.upg && player.upg[shot.weapon] ? 2 : 1);   // улучшенное оружие: урон x2
-    zombie.hp = Math.max(0, zombie.hp - damage);
+    const insta = (room.game.instaUntil || 0) > Date.now() && !isBossZombie(zombie);
+    zombie.hp = Math.max(0, zombie.hp - (insta ? Math.max(damage, zombie.hp) : damage));
     const killed = zombie.hp <= 0;
     if (killed) zombie.state = 'dying';
     const reward = ((killed ? (shot.weapon === -1 ? 90 : (head ? 75 : 45)) : 5) + (killed && zombie.boss ? 500 : 0) + (killed && zombie.kind === 'necro' ? 1500 : 0) + (killed && zombie.kind === 'brute' ? 3000 : 0)) * ((room.game.dpUntil || 0) > Date.now() ? 2 : 1);   // босс «Плевака»: +500 за убийство   // Double Points действует на всю комнату
@@ -434,7 +439,9 @@ function attachHandlers(socket) {
     if (killed) {
       const now = Date.now();
       room.game.drops = room.game.drops.filter(d => now - d.at < DROP_LIFE_MS);
-      const roll = Math.random(), kind = roll < DROP_CHANCE ? 'ammo' : (roll < DROP_CHANCE + DP_CHANCE ? 'double' : null);
+      const roll = Math.random();
+      const kind = roll < DROP_CHANCE ? 'ammo' : roll < DROP_CHANCE + DP_CHANCE ? 'double'
+        : roll < DROP_CHANCE + DP_CHANCE + INSTA_CHANCE ? 'insta' : roll < DROP_CHANCE + DP_CHANCE + INSTA_CHANCE + KABOOM_CHANCE ? 'kaboom' : null;
       if (kind) {
         drop = { id: `d${++room.game.dropSeq}`, kind, x: clamp(finite(zombie.x), -30, 30), y: finite(zombie.y), z: clamp(finite(zombie.z), -30, 30) };
         room.game.drops.push({ ...drop, at: now });
@@ -460,6 +467,17 @@ function attachHandlers(socket) {
     if (!near(player, d.x, d.z, 2.4, d.y - 0.6, d.y + 3.4)) return;
     room.game.drops.splice(i, 1);
     if (d.kind === 'double') { room.game.dpUntil = now + DP_MS; toRoom(room.code).emit('doublePoints', { duration: DP_MS / 1000, playerId: socket.id }); }
+    if (d.kind === 'insta') room.game.instaUntil = now + INSTA_MS;
+    if (d.kind === 'kaboom') {   // все обычные зомби погибают (без очков за каждого и без бонусов), подобравшему +400
+      player.points += KABOOM_POINTS; player.stats.earned += KABOOM_POINTS;
+      for (const z of room.game.zombies) {
+        if (z.state === 'dying' || isBossZombie(z)) continue;
+        z.hp = 0; z.state = 'dying';
+        room.game.revision++;
+        toRoom(room.code).emit('zombieHit', { zombieId: z.id, head: false, hp: 0, state: 'dying', killed: true, shooterId: socket.id, weapon: -2, points: player.points, reward: 0, drop: null, revision: room.game.revision });
+      }
+      sendGame(room);
+    }
     toRoom(room.code).emit('dropPicked', { id, playerId: socket.id, kind: d.kind || 'ammo' });
   });
 

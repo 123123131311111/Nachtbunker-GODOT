@@ -12,6 +12,7 @@ const MAX_PLAYERS = 4;
 const BAR_MAX = 4000, BAR_BUILD = 1500, BAR_REPAIR = 2000, BAR_CD_MS = 30000;   // баррикады у главных дверей домов (Verrückt), как на клиенте
 // Окна корпусов Verrückt (1 этаж) с металлическими прутьями. Порядок и координаты как VK_WINS на клиенте.
 const VKW_HP = 500, VKW_PRICE = 250, VKW_CD_MS = 30000;
+const STAMINA_PRICE = 2000;   // перк «Бег Ювсютина» (data/perks/perk_stamina.tres)
 const BUILDER_PRICE = 4000, BUILDER_DISC = 0.75, builderPrice = p => Math.max(1, Math.round(p * (1 - BUILDER_DISC)));   // перк «Строитель»: -75% на починку, как BLD_* на клиенте
 const VK_WINS = [];
 for (const sg of [-1, 1]) {
@@ -56,6 +57,7 @@ const WEAPONS = [
   { body: 130, head: 260, interval: 120, pellets: 1 }, // BAR (только Mystery Box)
   { body: 100, head: 200, interval: 75, pellets: 1 },  // FG-42 (только Mystery Box)
   { body: 120, head: 240, interval: 95, pellets: 1 },  // Type 99 (только Mystery Box)
+  { body: 190, head: 480, interval: 380, pellets: 1 }, // Револьвер .38 (только Mystery Box, Godot-клиент)
 ];
 // Всё, что привязано к карте. Порядок дверей и окон ОБЯЗАН совпадать с клиентом (index.html).
 // windows: [x, z, y] — центр окна на стене и высота глаз игрока на этом этаже.
@@ -81,6 +83,11 @@ const MAPS = {
       doubleTap: { x: -12, z: -14.25, minY: 3.2, maxY: 7.5 },
       juggernog: { x: -14.25, z: 2, minY: 3.2, maxY: 7.5 },
     },
+    // 1.7: Улучшайзер на крыше (лестница в конце 2 этажа) — сначала собирается за 5000, рубильников нет
+    upgrader: { x: -4, z: 10, minY: 7.5, maxY: 10.5, build: 5000 },
+    // ловушка «Артобстрел» (рация на крыше): с 8 раунда
+    trap: { x: -10.5, z: 7, minY: 7.5, maxY: 10.5, price: 2000, round: 8, cooldownMs: 60000 },
+    stamina: { x: 13.9, z: 2, minY: 7.5, maxY: 10.5 },   // перк «Бег Ювсютина» (Godot): крыша
   },
   verruckt: {
     doors: [
@@ -102,6 +109,8 @@ const MAPS = {
     builder: { x: 5.35, z: -4.6, minY: -1, maxY: 3.2 },   // перк «Строитель» (только Verrückt): напротив Быстрого возрождения, у фасада правого дома (как BLD на клиенте)
     levers: [{ x: -16.3, z: 2.4 }, { x: 16.3, z: 2.4 }],   // рубильники на 2 этаже корпусов (как LEVERS на клиенте)
     upgrader: { x: 30.9, z: -27.6 },   // Улучшайзер в северо-восточном углу двора (как UPG на клиенте)
+    trap: { x: -4.6, z: 7, minY: -1, maxY: 3.2, price: 1500, round: 8, cooldownMs: 45000 },   // 1.7: «Электрошок» у фонтана
+    stamina: { x: 13, z: -23.9, minY: -1, maxY: 3.2 },   // «Бег Ювсютина» (Godot): за сараем
     perks: {
       cola: { x: -7.2, z: 3.2, minY: 3.2, maxY: 7.5 },
       doubleTap: { x: 8.4, z: 3, minY: 3.2, maxY: 7.5 },
@@ -113,11 +122,13 @@ const MAPS = {
     doors: [
       { x: 0, z: 6, price: 750 }, { x: -14, z: 0, price: 1250 }, { x: 14, z: 0, price: 1250 },
       { x: -26, z: 6.5, price: 1000 }, { x: 0, z: -14, price: 1500 },
+      { x: -31, z: 6.5, price: 1000 }, { x: 31, z: 6.5, price: 1250 },   // 1.8: вход в дом со двора, склад
     ],
     windows: [
-      [-8.5, 6, 1.7], [8.5, 6, 1.7], [-8.5, -14, 1.7], [8.5, -14, 1.7], [-34, 3.6, 1.7], [-25.5, -6, 1.7],
+      [-8.5, 6, 1.7], [8.5, 6, 1.7], [-8.5, -14, 1.7], [8.5, -14, 1.7], [-34, 3.6, 1.7], [-25.5, -10, 1.7],
       [-14, 38, 1.7], [14, 38, 1.7], [-36, 22, 1.7], [36, 22, 1.7], [-12, -38, 1.7], [12, -38, 1.7], [-20, -26, 1.7],
       [-23, -8, -2.3], [-36, 0.5, -2.3], [32, -12, -2.3], [40, 12, -2.3], [40, -12, -2.3],
+      [29, -13, 1.7], [33, -13, 1.7],   // 1.8: окна склада
     ],
     wall: { thompson: { x: -13.8, z: -4 }, shotgun: { x: 13.8, z: -8 }, mp40: { x: -22.2, z: 3.5 } },
     box: { x: 0, z: -4, minY: -1, maxY: 3.2, available: dr => !!dr[0] },
@@ -125,6 +136,8 @@ const MAPS = {
     qr: { x: 43.35, z: 0, minY: -5.5, maxY: -1 },
     levers: [{ x: -20.2, z: -5 }, { x: 32, z: 11.8 }],
     upgrader: { x: 0, z: -23.8 },
+    trap: { x: -6, z: 3, minY: -1, maxY: 3.2, price: 1750, round: 8, cooldownMs: 50000 },   // 1.7: «Паровой выброс» в цеху
+    stamina: { x: 26.9, z: 4.3, minY: -1, maxY: 3.2 },   // «Бег Ювсютина»: склад
     perks: {
       cola: { x: -35.3, z: -4.5, minY: -5.5, maxY: -1 },
       doubleTap: { x: -13.3, z: -11.5, minY: 3.2, maxY: 7.5 },
@@ -155,7 +168,7 @@ function makePlayer(id, name, slot) {
   return {
     id, name: cleanName(name, id), color: ['#e04040', '#3a8ee6', '#46c46a', '#e6c83a'][slot], slot,
     x: 0, y: 1.7, z: 0, yaw: 0, pitch: 0, active: false, downed: false, reviving: null,
-    points: 500, hp: 100, perks: { cola: false, doubleTap: false, juggernog: false, builder: false },
+    points: 500, hp: 100, perks: { cola: false, doubleTap: false, juggernog: false, builder: false, stamina: false },
     stats: { kills: 0, heads: 0, downs: 0, revives: 0, earned: 0 }, weapon: 0, reloading: false, sprint: false,   // 1.27: таблица по TAB и оружие в руках у аватара
     owned: { thompson: false, shotgun: false, mp40: false }, upg: Object.create(null), shots: Object.create(null), lastShotAt: -Infinity,
   };
@@ -184,7 +197,7 @@ function gamePayload(room) {
     toSpawn: game.toSpawn,
     nextRoundIn: game.nextRoundIn,
     doors: game.doors.slice(),
-    levers: (game.levers || []).slice(),
+    levers: (game.levers || []).slice(), upgBuilt: !!game.upgBuilt,
     barricades: (game.barricades || []).slice(),
     vwindows: (game.vwindows || []).slice(),
     windowBoards: game.windowBoards,
@@ -570,6 +583,12 @@ function attachHandlers(socket) {
       if (!near(player, pk.x, pk.z, 2.8, pk.minY, pk.maxY)) return failPurchase(socket, 'Подойдите к автомату «Строитель»');
       if (player.perks.builder) return failPurchase(socket, '«Строитель» уже куплен');
       price = BUILDER_PRICE;
+    } else if (kind === 'stamina') {   // «Бег Ювсютина» (только Godot-клиент)
+      const pk = cfg.stamina;
+      if (!pk) return failPurchase(socket, 'На этой карте нет перка «Бег Ювсютина»');
+      if (!near(player, pk.x, pk.z, 2.8, pk.minY, pk.maxY)) return failPurchase(socket, 'Подойдите к автомату «Бег Ювсютина»');
+      if (player.perks.stamina) return failPurchase(socket, '«Бег Ювсютина» уже куплен');
+      price = STAMINA_PRICE;
     } else if (kind === 'thompson' || kind === 'shotgun') {
       const shotgun = kind === 'shotgun';
       const owned = shotgun ? player.owned.shotgun : player.owned.thompson;
@@ -589,17 +608,33 @@ function attachHandlers(socket) {
       if (room.game.boxBusyUntil > Date.now()) return failPurchase(socket, 'Mystery Box уже используется');
       price = 950;
       boxResult = 1 + Math.floor(Math.random() * (WEAPONS.length - 1));   // все, кроме стартового пистолета
+    } else if (kind === 'upgbuild') {   // 1.7: сборка Улучшайзера (Nacht, крыша)
+      const up = cfg.upgrader;
+      if (!up || !up.build) return failPurchase(socket, 'Здесь нечего собирать');
+      if (room.game.upgBuilt) return failPurchase(socket, 'Улучшайзер уже собран');
+      if (!near(player, up.x, up.z, 3.6, up.minY, up.maxY)) return failPurchase(socket, 'Подойдите к Улучшайзеру');
+      price = up.build;
+    } else if (kind === 'trap') {   // 1.7: ловушка карты (поздние раунды)
+      const tp = cfg.trap;
+      if (!tp) return failPurchase(socket, 'На этой карте нет ловушки');
+      if (room.game.round < tp.round) return failPurchase(socket, 'Ловушка доступна с ' + tp.round + ' раунда');
+      if ((room.game.trapReadyAt || 0) > Date.now()) return failPurchase(socket, 'Ловушка перезаряжается: ' + Math.ceil((room.game.trapReadyAt - Date.now()) / 1000) + ' с');
+      if (!near(player, tp.x, tp.z, 3.2, tp.minY, tp.maxY)) return failPurchase(socket, 'Подойдите к ловушке');
+      price = tp.price;
     } else return failPurchase(socket, 'Неизвестная покупка');
     if (player.points < price) return failPurchase(socket, 'Не хватает очков');
     player.points -= price;
     if (kind === 'box') room.game.boxBusyUntil = Date.now() + 3800;
     if (kind === 'door') room.game.doors[doorIndex] = true;
+    if (kind === 'upgbuild') room.game.upgBuilt = true;
+    if (kind === 'trap') room.game.trapReadyAt = Date.now() + cfg.trap.cooldownMs;
     if (kind === 'vwindow') { room.game.vwindows[doorIndex] = VKW_HP; room.game.vwRepairAt[doorIndex] = player.perks.builder ? 0 : Date.now() + VKW_CD_MS; }
     if (kind === 'barricade') { if (room.game.barricades[doorIndex - 3] > 0) room.game.barRepairAt[doorIndex - 3] = Date.now() + BAR_CD_MS; room.game.barricades[doorIndex - 3] = BAR_MAX; }
     if (kind === 'cola') player.perks.cola = true;
     if (kind === 'doubleTap') player.perks.doubleTap = true;
     if (kind === 'juggernog') player.perks.juggernog = true;
     if (kind === 'builder') player.perks.builder = true;
+    if (kind === 'stamina') player.perks.stamina = true;
     if (kind === 'thompson') player.owned.thompson = true;
     if (kind === 'shotgun') player.owned.shotgun = true;
     if (kind === 'mp40') player.owned.mp40 = true;
@@ -653,11 +688,12 @@ function attachHandlers(socket) {
     if (!ctx || !ctx.room.game.started) return;
     const { room, player } = ctx, up = cfgOf(room).upgrader;
     if (!up) return failPurchase(socket, 'Улучшайзера нет на этой карте');
-    if (!room.game.levers.every(Boolean)) return failPurchase(socket, 'Сначала включите оба рубильника');
+    if (up.build && !room.game.upgBuilt) return failPurchase(socket, 'Сначала соберите Улучшайзер');
+    if (!up.build && !room.game.levers.every(Boolean)) return failPurchase(socket, 'Сначала включите оба рубильника');
     weapon = Number(weapon);
     if (!Number.isInteger(weapon) || weapon < 0 || weapon >= WEAPONS.length) return;
     if (player.upg[weapon]) return failPurchase(socket, 'Это оружие уже улучшено');
-    if (!near(player, up.x, up.z, 3.4, -1, 3.2)) return failPurchase(socket, 'Подойдите к Улучшайзеру');
+    if (!near(player, up.x, up.z, 3.4, up.minY === undefined ? -1 : up.minY, up.maxY === undefined ? 3.2 : up.maxY)) return failPurchase(socket, 'Подойдите к Улучшайзеру');
     if ((room.game.upgBusyUntil || 0) > Date.now()) return failPurchase(socket, 'Улучшайзер занят');
     if (player.points < UPG_PRICE) return failPurchase(socket, 'Не хватает очков');
     player.points -= UPG_PRICE; player.upg[weapon] = true; room.game.upgBusyUntil = Date.now() + UPG_MS;
